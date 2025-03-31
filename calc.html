@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EcoCalc - Calculadora de Eficiência Energética</title>
+    <style>
+        /* === ESTILOS GERAIS (EVITANDO INLINE) === */
+        :root {
+            --verde-primario: #2E7D32;
+            --verde-claro: #81C784;
+            --cinza-claro: #F5F5F5;
+            --cinza-texto: #424242;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background-color: var(--cinza-claro);
+            color: var(--cinza-texto);
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        h1 {
+            color: var(--verde-primario);
+            margin-bottom: 5px;
+        }
+        
+        .subtitulo {
+            color: var(--cinza-texto);
+            font-weight: normal;
+        }
+        
+        .card {
+            background-color: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        .dispositivo {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+            align-items: center;
+        }
+        
+        select, input {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            flex-grow: 1;
+        }
+        
+        /* Estilo movido do inline para aqui */
+        .dispositivo input.horas {
+            width: 80px;
+        }
+        
+        button {
+            background-color: var(--verde-primario);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            width: 100%;
+            margin-top: 10px;
+        }
+        
+        button:hover {
+            background-color: var(--verde-claro);
+        }
+        
+        #resultados {
+            display: none;
+        }
+        
+        .grafico {
+            height: 200px;
+            background-color: #f0f0f0;
+            border-radius: 5px;
+            margin: 20px 0;
+            position: relative;
+        }
+        
+        .barra {
+            position: absolute;
+            bottom: 0;
+            background-color: var(--verde-primario);
+            width: 30px;
+        }
+        
+        /* Estilo movido do inline para aqui */
+        h4.recomendacao {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>EcoCalc</h1>
+        <p class="subtitulo">Descubra como economizar energia e reduzir suas emissões</p>
+    </header>
+    
+    <div class="card" id="entrada">
+        <h2>Seus Eletrodomésticos</h2>
+        
+        <div id="dispositivos-container">
+            <div class="dispositivo">
+                <select class="eletrodomestico" aria-label="Selecione um eletrodoméstico">
+                    <option value="">Selecione um dispositivo</option>
+                    <option value="geladeira">Geladeira Frost-Free</option>
+                    <option value="arcondicionado">Ar-Condicionado 12.000 BTU</option>
+                    <option value="tv">TV LED 50"</option>
+                    <option value="maquinalavar">Máquina de Lavar</option>
+                </select>
+                <input type="number" class="horas" placeholder="h/dia" min="0" max="24" value="8">
+            </div>
+        </div>
+        
+        <button id="adicionar">+ Adicionar outro dispositivo</button>
+        
+        <h2 style="margin-top: 30px;">Sua Localização</h2>
+        <input type="text" id="cep" placeholder="Digite seu CEP" maxlength="9">
+        <p>ou</p>
+        <select id="estado" aria-label="Selecione seu estado">
+            <option value="">Selecione seu estado</option>
+            <option value="SP">São Paulo</option>
+            <option value="RJ">Rio de Janeiro</option>
+            <option value="MG">Minas Gerais</option>
+        </select>
+        
+        <button id="calcular">Calcular meu consumo</button>
+    </div>
+    
+    <div class="card" id="resultados">
+        <h2>Seus Resultados</h2>
+        
+        <h3>Consumo Mensal</h3>
+        <div class="grafico" id="grafico-consumo">
+            <!-- Barras serão adicionadas via JavaScript -->
+        </div>
+        
+        <div style="display: flex; justify-content: space-between; margin-bottom: 30px;">
+            <div>
+                <h4>Custo Estimado</h4>
+                <p id="custo">R$ 0,00/mês</p>
+            </div>
+            <div>
+                <h4>Emissões de CO₂</h4>
+                <p id="emissoes">0 kg/mês</p>
+            </div>
+        </div>
+        
+        <h3>Recomendações</h3>
+        <div id="recomendacoes">
+            <!-- Recomendações serão adicionadas via JavaScript -->
+        </div>
+        
+        <button id="voltar">Recalcular</button>
+    </div>
+
+    <script>
+        // === DADOS DOS DISPOSITIVOS ===
+        const dispositivosData = {
+            "geladeira": 200,       // Watts
+            "arcondicionado": 1500,
+            "tv": 100,
+            "maquinalavar": 500
+        };
+        
+        // Tarifas de energia por estado (R$/kWh)
+        const tarifas = {
+            "SP": 0.90,
+            "RJ": 1.10,
+            "MG": 0.85
+        };
+        
+        // Fator de emissão de CO2 (kg/kWh)
+        const fatorCO2 = 0.1;
+        
+        // === ELEMENTOS DA INTERFACE ===
+        const entradaDiv = document.getElementById('entrada');
+        const resultadosDiv = document.getElementById('resultados');
+        const calcularBtn = document.getElementById('calcular');
+        const voltarBtn = document.getElementById('voltar');
+        const adicionarBtn = document.getElementById('adicionar');
+        const dispositivosContainer = document.getElementById('dispositivos-container');
+        const graficoConsumo = document.getElementById('grafico-consumo');
+        const custoElement = document.getElementById('custo');
+        const emissoesElement = document.getElementById('emissoes');
+        const recomendacoesElement = document.getElementById('recomendacoes');
+        const cepInput = document.getElementById('cep');
+        const estadoSelect = document.getElementById('estado');
+        
+        // === MÁSCARA PARA CEP ===
+        cepInput.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value.length > 5) {
+                value = value.substring(0,5) + '-' + value.substring(5,8);
+            }
+            e.target.value = value;
+        });
+        
+        // === ADICIONAR NOVO DISPOSITIVO ===
+        adicionarBtn.addEventListener('click', function() {
+            const novoDispositivo = document.createElement('div');
+            novoDispositivo.className = 'dispositivo';
+            novoDispositivo.innerHTML = `
+                <select class="eletrodomestico" aria-label="Selecione um eletrodoméstico">
+                    <option value="">Selecione um dispositivo</option>
+                    <option value="geladeira">Geladeira Frost-Free</option>
+                    <option value="arcondicionado">Ar-Condicionado 12.000 BTU</option>
+                    <option value="tv">TV LED 50"</option>
+                    <option value="maquinalavar">Máquina de Lavar</option>
+                </select>
+                <input type="number" class="horas" placeholder="h/dia" min="0" max="24" value="8">
+            `;
+            dispositivosContainer.appendChild(novoDispositivo);
+        });
+        
+        // === CALCULAR CONSUMO ===
+        calcularBtn.addEventListener('click', function() {
+            // Validação de entrada
+            const estado = estadoSelect.value;
+            const cep = cepInput.value.replace(/\D/g, '');
+            
+            if (!estado && cep.length < 8) {
+                alert('Por favor, informe seu CEP (completo) ou estado');
+                return;
+            }
+            
+            // Coletar dados dos dispositivos
+            const dispositivos = [];
+            const dispositivoElements = document.querySelectorAll('.dispositivo');
+            
+            dispositivoElements.forEach(div => {
+                const select = div.querySelector('.eletrodomestico');
+                const horasInput = div.querySelector('.horas');
+                
+                if (select.value && horasInput.value) {
+                    dispositivos.push({
+                        nome: select.options[select.selectedIndex].text,
+                        tipo: select.value,
+                        potencia: dispositivosData[select.value] || 0,
+                        horas: parseFloat(horasInput.value)
+                    });
+                }
+            });
+            
+            if (dispositivos.length === 0) {
+                alert('Por favor, adicione pelo menos um dispositivo');
+                return;
+            }
+            
+            // Calcular resultados
+            const tarifa = tarifas[estado] || 0.90; // Default SP
+            let consumoTotal = 0;
+            let resultados = [];
+            
+            dispositivos.forEach(disp => {
+                const consumo = (disp.potencia * disp.horas * 30) / 1000; // kWh/mês
+                consumoTotal += consumo;
+                resultados.push({
+                    nome: disp.nome,
+                    consumo: consumo,
+                    percentual: 0 // Será calculado depois
+                });
+            });
+            
+            // Calcular percentuais
+            resultados.forEach(res => {
+                res.percentual = (res.consumo / consumoTotal) * 100;
+            });
+            
+            // Ordenar por consumo
+            resultados.sort((a, b) => b.consumo - a.consumo);
+            
+            // Calcular custo e emissões
+            const custo = consumoTotal * tarifa;
+            const emissoes = consumoTotal * fatorCO2;
+            
+            // Exibir resultados
+            exibirResultados(resultados, consumoTotal, custo, emissoes);
+        });
+        
+        // === VOLTAR PARA TELA DE ENTRADA ===
+        voltarBtn.addEventListener('click', function() {
+            entradaDiv.style.display = 'block';
+            resultadosDiv.style.display = 'none';
+        });
+        
+        // === FUNÇÃO PARA EXIBIR RESULTADOS ===
+        function exibirResultados(resultados, consumoTotal, custo, emissoes) {
+            // Esconder entrada e mostrar resultados
+            entradaDiv.style.display = 'none';
+            resultadosDiv.style.display = 'block';
+            
+            // Atualizar valores totais
+            custoElement.textContent = `R$ ${custo.toFixed(2)}/mês`;
+            emissoesElement.textContent = `${emissoes.toFixed(1)} kg/mês (≈ ${Math.round(emissoes/10)} árvores`;
+            
+            // Criar gráfico de barras
+            graficoConsumo.innerHTML = '';
+            const maxConsumo = resultados[0].consumo;
+            
+            resultados.forEach((res, index) => {
+                const altura = (res.consumo / maxConsumo) * 180;
+                const barra = document.createElement('div');
+                barra.className = 'barra';
+                barra.style.height = `${altura}px`;
+                barra.style.left = `${index * 40 + 20}px`;
+                barra.title = `${res.nome}: ${res.consumo.toFixed(1)} kWh (${res.percentual.toFixed(0)}%)`;
+                graficoConsumo.appendChild(barra);
+            });
+            
+            // Gerar recomendações
+            recomendacoesElement.innerHTML = '';
+            
+            // Recomendação para o maior consumidor
+            const maiorConsumidor = resultados[0];
+            
+            if (maiorConsumidor.consumo > 100) {
+                const rec = document.createElement('div');
+                rec.innerHTML = `
+                    <h4 class="recomendacao">🔍 Maior Oportunidade de Economia</h4>
+                    <p>Seu ${maiorConsumidor.nome} é responsável por ${maiorConsumidor.percentual.toFixed(0)}% do seu consumo.</p>
+                    <p>💡 <strong>Dica:</strong> ${gerarDica(maiorConsumidor.tipo)}</p>
+                `;
+                recomendacoesElement.appendChild(rec);
+            }
+            
+            // Recomendação geral
+            const recGeral = document.createElement('div');
+            recGeral.innerHTML = `
+                <h4 class="recomendacao">🌱 Energia Renovável</h4>
+                <p>Para seu consumo de ${consumoTotal.toFixed(1)} kWh/mês, recomendamos:</p>
+                <p>☀️ <strong>Sistema solar:</strong> ${Math.round(consumoTotal/100)} painéis (economia de R$ ${(custo*0.9).toFixed(2)}/mês)</p>
+            `;
+            recomendacoesElement.appendChild(recGeral);
+        }
+        
+        // === GERAR DICAS ESPECÍFICAS ===
+        function gerarDica(tipo) {
+            const dicas = {
+                "geladeira": "Considere substituir por um modelo com selo Procel A++ (até 70% de economia).",
+                "arcondicionado": "Reduza 1 hora de uso diário ou substitua por modelo Inverter (economia de 40%).",
+                "tv": "Desligue completamente quando não estiver usando (evite modo standby).",
+                "maquinalavar": "Use apenas com carga completa e no modo econômico."
+            };
+            
+            return dicas[tipo] || "Verifique se o dispositivo está em bom estado de conservação.";
+        }
+    </script>
+</body>
+</html>
