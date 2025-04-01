@@ -11,6 +11,8 @@
             --verde-claro: #81C784;
             --cinza-claro: #F5F5F5;
             --cinza-texto: #424242;
+            --azul-pdf: #1565C0;
+            --azul-compartilhar: #1976D2;
         }
         
         body {
@@ -79,6 +81,7 @@
             font-weight: bold;
             width: 100%;
             margin-top: 10px;
+            transition: background-color 0.3s;
         }
         
         button:hover {
@@ -108,7 +111,37 @@
         h4.recomendacao {
             margin-top: 20px;
         }
+
+        /* Novos estilos para os botões de ação */
+        .botoes-acoes {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .botoes-acoes button {
+            margin-top: 0;
+            flex: 1;
+        }
+
+        #exportar-pdf {
+            background-color: var(--azul-pdf);
+        }
+
+        #exportar-pdf:hover {
+            background-color: #0D47A1;
+        }
+
+        #compartilhar {
+            background-color: var(--azul-compartilhar);
+        }
+
+        #compartilhar:hover {
+            background-color: #0D47A1;
+        }
     </style>
+    <!-- Biblioteca para gerar PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
 <body>
     <header>
@@ -173,6 +206,11 @@
         </div>
         
         <button id="voltar">Recalcular</button>
+        
+        <div class="botoes-acoes">
+            <button id="exportar-pdf">Exportar PDF</button>
+            <button id="compartilhar">Compartilhar</button>
+        </div>
     </div>
 
     <script>
@@ -207,6 +245,8 @@
         const recomendacoesElement = document.getElementById('recomendacoes');
         const cepInput = document.getElementById('cep');
         const estadoSelect = document.getElementById('estado');
+        const exportarPdfBtn = document.getElementById('exportar-pdf');
+        const compartilharBtn = document.getElementById('compartilhar');
         
         // === MÁSCARA PARA CEP ===
         cepInput.addEventListener('input', function(e) {
@@ -278,6 +318,7 @@
                 consumoTotal += consumo;
                 resultados.push({
                     nome: disp.nome,
+                    tipo: disp.tipo,
                     consumo: consumo,
                     percentual: 0 // Será calculado depois
                 });
@@ -303,6 +344,42 @@
         voltarBtn.addEventListener('click', function() {
             entradaDiv.style.display = 'block';
             resultadosDiv.style.display = 'none';
+        });
+        
+        // === EXPORTAR PARA PDF ===
+        exportarPdfBtn.addEventListener('click', function() {
+            // Usaremos html2pdf para gerar o PDF
+            const element = document.getElementById('resultados');
+            const opt = {
+                margin: 10,
+                filename: 'EcoCalc_Resultados.pdf',
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            // Verifica se html2pdf está disponível
+            if (typeof html2pdf !== 'undefined') {
+                html2pdf().from(element).set(opt).save();
+            } else {
+                alert('Biblioteca de PDF não carregada. Por favor, tente recarregar a página.');
+            }
+        });
+        
+        // === COMPARTILHAR RESULTADOS ===
+        compartilharBtn.addEventListener('click', function() {
+            if (navigator.share) {
+                navigator.share({
+                    title: 'Meus Resultados de Economia de Energia',
+                    text: 'Confira meus resultados de consumo energético com a EcoCalc!',
+                    url: window.location.href
+                }).catch(err => {
+                    console.log('Erro ao compartilhar:', err);
+                });
+            } else {
+                // Fallback para dispositivos que não suportam a API de compartilhamento
+                alert('Seu navegador não suporta a função de compartilhamento nativo. Copie o link manualmente: ' + window.location.href);
+            }
         });
         
         // === FUNÇÃO PARA EXIBIR RESULTADOS ===
